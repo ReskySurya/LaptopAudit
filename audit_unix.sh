@@ -49,15 +49,14 @@ else
     MODEL=$(cat /sys/class/dmi/id/product_name 2>/dev/null || dmidecode -s system-product-name 2>/dev/null || echo "Unknown")
     SERIAL=$(cat /sys/class/dmi/id/product_serial 2>/dev/null || sudo dmidecode -s system-serial-number 2>/dev/null || echo "Unknown")
     CPU=$(cat /proc/cpuinfo 2>/dev/null | grep "model name" | head -1 | awk -F': ' '{print $2}' || echo "Unknown")
-    CORES=$(nproc --all 2>/dev/null || grep -c ^processor /proc/cpuinfo 2>/dev/null || echo "Unknown")
-    THREADS=$CORES
-    RAM_KB=$(grep MemTotal /proc/meminfo 2>/dev/null | awk '{print $2}')
-    RAM_GB=$(echo "scale=2; $RAM_KB / 1048576" | bc 2>/dev/null || echo "Unknown")
+    CORES=$(grep -P '^core id' /proc/cpuinfo | sort -u | wc -l || echo "Unknown")
+    THREADS=$(nproc --all 2>/dev/null || grep -c ^processor /proc/cpuinfo 2>/dev/null || echo "Unknown")
+    RAM_GB=$(free -h | awk '/Mem:/ {print $2}')
 fi
 
 # ---- Storage ----
-STORAGE_INFO=$(df -h --output=source,size,used,avail,target 2>/dev/null | grep "^/" | \
-    awk '{printf "%s: Total %s | Used %s | Free %s | Mount %s\n", $1, $2, $3, $4, $5}' || \
+STORAGE_INFO=$(df -h --output=source,size,used,avail,target 2>/dev/null | grep "^/" |
+    awk '{printf "%s: Total %s | Used %s | Free %s | Mount %s\n", $1, $2, $3, $4, $5}' ||
     df -h 2>/dev/null | grep "^/" | awk '{printf "%s: Total %s | Used %s | Free %s | Mount %s\n", $1, $2, $3, $4, $5}')
 
 # ---- IP & MAC ----
@@ -65,7 +64,7 @@ if [ "$OS_TYPE" = "Darwin" ]; then
     IP_ADDRESS=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || echo "Unknown")
     MAC_ADDRESS=$(ifconfig en0 2>/dev/null | awk '/ether/{print $2}' || echo "Unknown")
 else
-    IP_ADDRESS=$(hostname -I 2>/dev/null | awk '{print $1}' || ip route get 1 2>/dev/null | awk '{print $7}' || echo "Unknown")
+    IP_ADDRESS=$(hostname -i 2>/dev/null | awk '{print $1}' || ip route get 1 2>/dev/null | awk '{print $7}' || echo "Unknown")
     MAC_ADDRESS=$(ip link show 2>/dev/null | awk '/ether/{print $2}' | head -1 || cat /sys/class/net/*/address 2>/dev/null | head -1 || echo "Unknown")
 fi
 
@@ -82,10 +81,10 @@ if [ "$OS_TYPE" = "Darwin" ]; then
     IOREG=$(ioreg -r -c AppleSmartBattery 2>/dev/null)
     if [ -n "$IOREG" ]; then
         DC=$(echo "$IOREG" | grep '"DesignCapacity" = ' | awk '{print $3}')
-        FC=$(echo "$IOREG" | grep '"MaxCapacity" = '    | awk '{print $3}')
+        FC=$(echo "$IOREG" | grep '"MaxCapacity" = ' | awk '{print $3}')
         CURR=$(echo "$IOREG" | grep '"CurrentCapacity" = ' | awk '{print $3}')
-        VOLT=$(echo "$IOREG" | grep '"Voltage" = '     | awk '{print $3}')
-        CHARG=$(echo "$IOREG" | grep '"IsCharging" = '  | awk '{print $3}')
+        VOLT=$(echo "$IOREG" | grep '"Voltage" = ' | awk '{print $3}')
+        CHARG=$(echo "$IOREG" | grep '"IsCharging" = ' | awk '{print $3}')
 
         if [ -n "$DC" ] && [ -n "$FC" ] && [ -n "$VOLT" ]; then
             BAT_DESIGN=$(echo "scale=2; ($DC * $VOLT) / 1000000" | bc)
@@ -105,23 +104,23 @@ if [ "$OS_TYPE" = "Darwin" ]; then
     fi
 else
     # Linux
-    BAT_PATH="/sys/class/power_supply/BAT0"
-    if [ ! -d "$BAT_PATH" ]; then BAT_PATH="/sys/class/power_supply/BAT1"; fi
-    if [ -d "$BAT_PATH" ]; then
-        [ -f "$BAT_PATH/capacity" ] && BAT_PCT="$(cat $BAT_PATH/capacity)%"
-        [ -f "$BAT_PATH/status"   ] && BAT_STATUS=$(cat $BAT_PATH/status)
+    BAT=$(upower -i $(upower -e | grep 'BAT'))
 
-        if [ -f "$BAT_PATH/energy_full_design" ] && [ -f "$BAT_PATH/energy_full" ]; then
-            DC=$(cat $BAT_PATH/energy_full_design)
-            FC=$(cat $BAT_PATH/energy_full)
-            BAT_DESIGN=$(echo "scale=2; $DC / 1000000" | bc)
-            BAT_CURRENT=$(echo "scale=2; $FC / 1000000" | bc)
-            BAT_DESIGN="${BAT_DESIGN} Wh"
-            BAT_CURRENT="${BAT_CURRENT} Wh"
-            if [ "$DC" -gt 0 ]; then
-                BAT_HEALTH=$(echo "scale=2; ($FC * 100) / $DC" | bc)
-                BAT_HEALTH="${BAT_HEALTH}%"
-            fi
+    if [ -n "$BAT" ]; then
+        INFO=$(upower -i "$BAT")
+
+        BAT_PCT=$(echo "$INFO" | awk -F: '/percentage/ {gsub(/ /,"",$2); print $2}')
+        BAT_DESIGN=$(echo "$INFO" | awk -F: '/energy-full-design/ {gsub(/^ +/,"",$2); print $2}')
+        BAT_CURRENT=$(echo "$INFO" | awk -F: '/energy-full:/ {gsub(/^ +/,"",$2); print $2}')
+        BAT_STATUS=$(echo "$INFO" | awk -F: '/state/ {gsub(/^ +/,"",$2); print $2}')
+
+        DESIGN_NUM=$(echo "$BAT_DESIGN" | awk '{print $1}')
+        CURRENT_NUM=$(echo "$BAT_CURRENT" | awk '{print $1}')
+
+        if [[ -n "$DESIGN_NUM" && -n "$CURRENT_NUM" ]]; then
+            BAT_HEALTH=$(awk "BEGIN {printf \"%.1f%%\", ($CURRENT_NUM/$DESIGN_NUM)*100}")
+        else
+            BAT_HEALTH="N/A"
         fi
     fi
 fi
@@ -161,7 +160,7 @@ FILENAME="asset_${ASSET}.txt"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 OUTPUT_PATH="${SCRIPT_DIR}/${FILENAME}"
 
-cat > "$OUTPUT_PATH" << EOF
+cat >"$OUTPUT_PATH" <<EOF
 === LAPORAN PENGECEKAN LAPTOP ===
 
 Tanggal        : $TANGGAL
@@ -179,7 +178,7 @@ Serial Number  : $SERIAL
 
 CPU            : $CPU
 CPU Cores      : $CORES core / $THREADS thread
-RAM            : $RAM_GB GB
+RAM            : $RAM_GB
 Storage        :
 $STORAGE_INFO
 
@@ -189,7 +188,6 @@ MAC Address    : $MAC_ADDRESS
 === BATTERY ===
 
 Battery (%)      : $BAT_PCT
-Charging Status  : $BAT_STATUS
 Design Capacity  : $BAT_DESIGN
 Current Max Cap  : $BAT_CURRENT
 Battery Health   : $BAT_HEALTH
