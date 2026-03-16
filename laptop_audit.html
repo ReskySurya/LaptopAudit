@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Laptop Asset Audit — Review</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg: #f5f4f0;
+    --card: #ffffff;
+    --border: #e0ded8;
+    --text: #1a1a18;
+    --muted: #6b6a65;
+    --accent: #1a6ef5;
+    --accent-light: #e8f0fe;
+    --success: #1a7a4a;
+    --success-light: #e6f4ec;
+    --warn: #b45309;
+    --warn-light: #fef3c7;
+    --danger: #c0392b;
+    --danger-light: #fde8e6;
+    --radius: 10px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a18; --card: #242422; --border: #333330;
+      --text: #e8e6e0; --muted: #999890; --accent: #4a8ff7;
+      --accent-light: #1a2a44; --success-light: #0e2e1e;
+      --warn-light: #2a1e08; --danger-light: #2a1010;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  header {
+    background: var(--card); border-bottom: 1px solid var(--border);
+    padding: 16px 28px; display: flex; align-items: center; gap: 14px;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo { width: 34px; height: 34px; background: var(--accent); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 16px; }
+  header h1 { font-size: 16px; font-weight: 600; }
+  header .sub { font-size: 12px; color: var(--muted); }
+  .header-right { margin-left: auto; display: flex; gap: 8px; }
+
+  .container { max-width: 820px; margin: 0 auto; padding: 24px 20px 60px; }
+
+  /* Drop zone */
+  #dropzone {
+    border: 2px dashed var(--border); border-radius: 14px;
+    padding: 52px 32px; text-align: center; cursor: pointer;
+    transition: border-color .2s, background .2s; background: var(--card);
+    margin-bottom: 24px;
+  }
+  #dropzone:hover, #dropzone.drag { border-color: var(--accent); background: var(--accent-light); }
+  #dropzone .dz-icon { font-size: 40px; margin-bottom: 12px; }
+  #dropzone h2 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+  #dropzone p { font-size: 13px; color: var(--muted); }
+  #dropzone .dz-btn {
+    margin-top: 16px; display: inline-block; padding: 9px 20px;
+    border: 1px solid var(--accent); color: var(--accent); border-radius: 8px;
+    font-size: 13px; font-weight: 600; cursor: pointer; background: transparent;
+  }
+  #dropzone .dz-btn:hover { background: var(--accent); color: white; }
+  #file-input { display: none; }
+
+  /* Panels */
+  #review-panel { display: none; }
+
+  .section-title {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .08em; color: var(--muted); margin: 20px 0 10px;
+    padding-left: 4px;
+  }
+
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px 22px; margin-bottom: 12px;
+    box-shadow: var(--shadow);
+  }
+  .card-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .card-title { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 7px; }
+  .card-title .icon { font-size: 15px; }
+
+  .info-row {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 8px 0; border-bottom: 1px solid var(--border); gap: 16px;
+  }
+  .info-row:last-child { border-bottom: none; }
+  .info-key { font-size: 13px; color: var(--muted); min-width: 150px; flex-shrink: 0; }
+  .info-val { font-size: 13px; font-weight: 500; text-align: right; word-break: break-word; max-width: 60%; }
+
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .badge-ok   { background: var(--success-light); color: var(--success); }
+  .badge-warn { background: var(--warn-light);    color: var(--warn); }
+  .badge-bad  { background: var(--danger-light);  color: var(--danger); }
+  .badge-info { background: var(--accent-light);  color: var(--accent); }
+  .badge-gray { background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
+
+  .summary-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px;
+  }
+  @media (max-width: 500px) { .summary-grid { grid-template-columns: 1fr 1fr; } }
+  .stat-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px 12px; text-align: center; }
+  .stat-val  { font-size: 19px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+  .stat-key  { font-size: 11px; color: var(--muted); }
+
+  .bat-bar { margin: 6px 0 2px; height: 7px; background: var(--border); border-radius: 4px; overflow: hidden; }
+  .bat-fill { height: 100%; border-radius: 4px; }
+
+  /* Software list */
+  .sw-search {
+    width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 7px;
+    font-size: 13px; background: var(--bg); color: var(--text); margin-bottom: 10px; outline: none;
+  }
+  .sw-search:focus { border-color: var(--accent); }
+  .sw-list { max-height: 320px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; }
+  .sw-item {
+    padding: 8px 14px; font-size: 13px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .sw-item:last-child { border-bottom: none; }
+  .sw-item:hover { background: var(--accent-light); }
+  .sw-num { font-size: 11px; color: var(--muted); min-width: 28px; }
+  .sw-count { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+
+  /* Buttons */
+  .btn {
+    padding: 9px 18px; border-radius: 8px; font-size: 13px; font-weight: 600;
+    border: 1px solid var(--border); cursor: pointer; transition: all .15s;
+    display: inline-flex; align-items: center; gap: 7px; background: var(--card); color: var(--text);
+  }
+  .btn:hover { background: var(--bg); }
+  .btn-primary { background: var(--accent); color: white; border-color: var(--accent); }
+  .btn-primary:hover { filter: brightness(1.1); }
+  .btn-success { background: var(--success); color: white; border-color: var(--success); }
+  .btn-success:hover { filter: brightness(1.1); }
+
+  .action-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+
+  /* Raw text */
+  .raw-box {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 14px; font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 12px;
+    white-space: pre-wrap; word-break: break-word; max-height: 400px; overflow-y: auto;
+    color: var(--text);
+  }
+
+  #toast {
+    position: fixed; bottom: 24px; right: 24px; background: #1a1a18; color: white;
+    padding: 11px 17px; border-radius: 8px; font-size: 13px;
+    opacity: 0; transform: translateY(8px); transition: opacity .25s, transform .25s;
+    pointer-events: none; z-index: 999;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+
+  .health-note {
+    font-size: 12px; color: var(--muted); margin-top: 10px; padding: 8px 12px;
+    background: var(--bg); border-radius: 6px; border-left: 3px solid var(--accent);
+  }
+
+  .tab-bar { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+  .tab {
+    padding: 8px 16px; font-size: 13px; font-weight: 500; cursor: pointer;
+    border-bottom: 2px solid transparent; color: var(--muted); transition: color .15s;
+    margin-bottom: -1px;
+  }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">💻</div>
+  <div>
+    <div class="header-title" style="font-size:15px;font-weight:600;">Laptop Asset Audit</div>
+    <div class="sub">Review & Export Laporan</div>
+  </div>
+  <div class="header-right" id="header-actions" style="display:none">
+    <button class="btn" onclick="resetView()">📂 Buka File Lain</button>
+    <button class="btn btn-primary" onclick="exportXlsx()">📊 Export XLSX</button>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- Drop zone -->
+  <div id="dropzone" onclick="document.getElementById('file-input').click()"
+       ondragover="event.preventDefault();this.classList.add('drag')"
+       ondragleave="this.classList.remove('drag')"
+       ondrop="handleDrop(event)">
+    <div class="dz-icon">📄</div>
+    <h2>Buka file laporan audit</h2>
+    <p>Drag & drop file <strong>asset_*.txt</strong> ke sini<br>atau klik tombol di bawah</p>
+    <div class="dz-btn">Pilih File .TXT</div>
+    <input type="file" id="file-input" accept=".txt" onchange="handleFile(this.files[0])">
+  </div>
+
+  <!-- Review Panel -->
+  <div id="review-panel">
+
+    <!-- Summary cards -->
+    <div class="summary-grid" id="summary-grid"></div>
+
+    <!-- Tabs -->
+    <div class="tab-bar">
+      <div class="tab active" onclick="switchTab('tab-sistem', this)">🖥️ Sistem</div>
+      <div class="tab" onclick="switchTab('tab-battery', this)">🔋 Baterai</div>
+      <div class="tab" onclick="switchTab('tab-software', this)">📦 Software</div>
+      <div class="tab" onclick="switchTab('tab-raw', this)">📝 Raw</div>
+    </div>
+
+    <!-- Tab: Sistem -->
+    <div class="tab-panel active" id="tab-sistem">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">🏷️</span> Identitas Asset</div>
+        </div>
+        <div id="info-asset"></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">🖥️</span> Informasi Sistem</div>
+        </div>
+        <div id="info-sistem"></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">🌐</span> Jaringan</div>
+        </div>
+        <div id="info-network"></div>
+      </div>
+    </div>
+
+    <!-- Tab: Battery -->
+    <div class="tab-panel" id="tab-battery">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">🔋</span> Status Baterai</div>
+        </div>
+        <div id="info-battery"></div>
+      </div>
+    </div>
+
+    <!-- Tab: Software -->
+    <div class="tab-panel" id="tab-software">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="icon">📦</span> Software Terinstall</div>
+        </div>
+        <div class="sw-count" id="sw-count"></div>
+        <input class="sw-search" type="search" id="sw-search" placeholder="🔍  Cari nama software..." oninput="filterSoftware(this.value)">
+        <div class="sw-list" id="sw-list"></div>
+      </div>
+    </div>
+
+    <!-- Tab: Raw -->
+    <div class="tab-panel" id="tab-raw">
+      <div class="card">
+        <div class="card-title" style="margin-bottom:12px;"><span class="icon">📝</span> Isi File Asli</div>
+        <div class="raw-box" id="raw-content"></div>
+      </div>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn" onclick="resetView()">📂 Buka File Lain</button>
+      <button class="btn btn-success" onclick="exportXlsx()">📊 Export ke XLSX</button>
+    </div>
+
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+let parsedData = {};
+let allSoftware = [];
+let rawText = '';
+
+function toast(msg, dur = 2500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), dur);
+}
+
+function switchTab(id, el) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  el.classList.add('active');
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('dropzone').classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file) handleFile(file);
+}
+
+function handleFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => { parseAndRender(e.target.result); };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function parseAndRender(text) {
+  rawText = text;
+  parsedData = parseTxt(text);
+  renderAll();
+  document.getElementById('dropzone').style.display = 'none';
+  document.getElementById('review-panel').style.display = 'block';
+  document.getElementById('header-actions').style.display = 'flex';
+}
+
+// ---- Parser ----
+function parseTxt(text) {
+  const d = {};
+  const lines = text.split('\n');
+
+  function get(key) {
+    for (const l of lines) {
+      const match = l.match(new RegExp('^' + key + '\\s*:\\s*(.+)$'));
+      if (match) return match[1].trim();
+    }
+    return '';
+  }
+
+  d.tanggal  = get('Tanggal');
+  d.asset    = get('Kode Asset');
+  d.pic      = get('PIC Asset');
+  d.hostname = get('Hostname');
+  d.username = get('Username');
+  d.os       = get('OS');
+  d.vendor   = get('Vendor');
+  d.model    = get('Model');
+  d.serial   = get('Serial Number');
+  d.cpu      = get('CPU');
+  d.cores    = get('CPU Cores');
+  d.ram      = get('RAM');
+  d.ip       = get('IP Address');
+  d.mac      = get('MAC Address');
+
+  // Storage — bisa multi baris
+  const storIdx = lines.findIndex(l => l.match(/^Storage\s*:/));
+  if (storIdx >= 0) {
+    const storLines = [];
+    const inline = lines[storIdx].replace(/^Storage\s*:\s*/, '').trim();
+    if (inline) storLines.push(inline);
+    let i = storIdx + 1;
+    while (i < lines.length && (lines[i].startsWith('               ') || lines[i].match(/^\s{2,}[\w/]/))) {
+      const sl = lines[i].trim();
+      if (sl) storLines.push(sl);
+      i++;
+    }
+    d.storage = storLines.join('\n');
+  } else {
+    d.storage = '';
+  }
+
+  d.bat_pct     = get('Battery \\(%\\)');
+  d.bat_charge  = get('Charging Status');
+  d.bat_design  = get('Design Capacity');
+  d.bat_current = get('Current Max Cap');
+  d.bat_health  = get('Battery Health');
+
+  // Software: setelah baris === SOFTWARE INSTALLED ===
+  const swIdx = lines.findIndex(l => l.includes('SOFTWARE INSTALLED'));
+  if (swIdx >= 0) {
+    d.software = lines.slice(swIdx + 2).map(l => l.trim()).filter(l => l.length > 0);
+  } else {
+    d.software = [];
+  }
+
+  return d;
+}
+
+// ---- Render ----
+function infoRow(key, val, badge) {
+  const valHtml = badge ? `<span class="badge ${badge}">${val}</span>` : `<span class="info-val">${val || '<span style="color:var(--muted)">—</span>'}</span>`;
+  return `<div class="info-row"><span class="info-key">${key}</span>${valHtml}</div>`;
+}
+
+function renderAll() {
+  const d = parsedData;
+
+  // Battery %
+  const batNum = parseInt(d.bat_pct);
+  const batColor = !isNaN(batNum) ? (batNum >= 60 ? '#22c55e' : batNum >= 30 ? '#f59e0b' : '#ef4444') : '#999';
+  const batBadge = !isNaN(batNum) ? (batNum >= 60 ? 'badge-ok' : batNum >= 30 ? 'badge-warn' : 'badge-bad') : 'badge-gray';
+
+  // Battery health %
+  const healthNum = parseFloat(d.bat_health);
+  const healthBadge = !isNaN(healthNum) ? (healthNum >= 80 ? 'badge-ok' : healthNum >= 60 ? 'badge-warn' : 'badge-bad') : 'badge-gray';
+
+  // Summary grid
+  document.getElementById('summary-grid').innerHTML = `
+    <div class="stat-card"><div class="stat-val">${d.asset || '—'}</div><div class="stat-key">Kode Asset</div></div>
+    <div class="stat-card"><div class="stat-val">${d.pic || '—'}</div><div class="stat-key">PIC Asset</div></div>
+    <div class="stat-card"><div class="stat-val">${d.software.length}</div><div class="stat-key">Software</div></div>
+    <div class="stat-card"><div class="stat-val" style="color:${batColor}">${d.bat_pct || '—'}</div><div class="stat-key">Baterai</div></div>
+    <div class="stat-card"><div class="stat-val">${d.bat_health || '—'}</div><div class="stat-key">Battery Health</div></div>
+    <div class="stat-card"><div class="stat-val" style="font-size:13px;font-weight:600;">${(d.os||'').split(' ')[0] || '—'}</div><div class="stat-key">OS</div></div>
+  `;
+
+  // Asset info
+  document.getElementById('info-asset').innerHTML =
+    infoRow('Kode Asset', d.asset) +
+    infoRow('PIC Asset', d.pic) +
+    infoRow('Tanggal Audit', d.tanggal);
+
+  // Sistem
+  document.getElementById('info-sistem').innerHTML =
+    infoRow('Hostname', d.hostname) +
+    infoRow('Username', d.username) +
+    infoRow('OS', d.os, 'badge-info') +
+    infoRow('Vendor', d.vendor) +
+    infoRow('Model', d.model) +
+    infoRow('Serial Number', `<code style="font-size:12px">${d.serial}</code>`) +
+    infoRow('CPU', d.cpu) +
+    infoRow('CPU Cores', d.cores) +
+    infoRow('RAM', d.ram) +
+    (d.storage ? `<div class="info-row"><span class="info-key">Storage</span><span class="info-val" style="font-size:12px;font-family:monospace;text-align:right">${d.storage.replace(/\n/g,'<br>')}</span></div>` : '');
+
+  // Network
+  document.getElementById('info-network').innerHTML =
+    infoRow('IP Address', d.ip) +
+    infoRow('MAC Address', d.mac);
+
+  // Battery
+  const batBarHtml = !isNaN(batNum) ? `<div class="bat-bar"><div class="bat-fill" style="width:${batNum}%;background:${batColor}"></div></div>` : '';
+  document.getElementById('info-battery').innerHTML =
+    infoRow('Battery Level', d.bat_pct, batBadge) +
+    batBarHtml +
+    infoRow('Charging Status', d.bat_charge) +
+    infoRow('Design Capacity', d.bat_design) +
+    infoRow('Current Max Cap', d.bat_current) +
+    infoRow('Battery Health', d.bat_health, healthBadge) +
+    (!isNaN(healthNum) && healthNum < 80 ?
+      `<div class="health-note">⚠️ Battery health di bawah 80% — pertimbangkan penggantian baterai.</div>` : '');
+
+  // Software
+  allSoftware = d.software;
+  renderSoftware(allSoftware);
+
+  // Raw
+  document.getElementById('raw-content').textContent = rawText;
+}
+
+function renderSoftware(list) {
+  document.getElementById('sw-count').textContent = `${list.length} software ditemukan`;
+  document.getElementById('sw-list').innerHTML = list.length
+    ? list.map((s, i) => `<div class="sw-item"><span class="sw-num">${i + 1}</span>${escHtml(s)}</div>`).join('')
+    : '<div class="sw-item" style="color:var(--muted);justify-content:center">Tidak ada hasil</div>';
+}
+
+function filterSoftware(q) {
+  const filtered = q ? allSoftware.filter(s => s.toLowerCase().includes(q.toLowerCase())) : allSoftware;
+  renderSoftware(filtered);
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function resetView() {
+  document.getElementById('dropzone').style.display = 'block';
+  document.getElementById('review-panel').style.display = 'none';
+  document.getElementById('header-actions').style.display = 'none';
+  document.getElementById('file-input').value = '';
+  parsedData = {}; allSoftware = []; rawText = '';
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', i===0));
+  document.querySelectorAll('.tab-panel').forEach((p,i) => p.classList.toggle('active', i===0));
+}
+
+function exportXlsx() {
+  const d = parsedData;
+  if (!d.asset) { toast('⚠️ Buka file .txt terlebih dahulu'); return; }
+
+  const wb = XLSX.utils.book_new();
+
+  // Sheet 1: Ringkasan
+  const s1 = [
+    ['LAPORAN PENGECEKAN LAPTOP', ''],
+    [''],
+    ['Tanggal Audit',   d.tanggal],
+    ['Kode Asset',      d.asset],
+    ['PIC Asset',       d.pic],
+    [''],
+    ['INFORMASI SISTEM', ''],
+    ['Hostname',        d.hostname],
+    ['Username',        d.username],
+    ['OS',              d.os],
+    ['Vendor',          d.vendor],
+    ['Model',           d.model],
+    ['Serial Number',   d.serial],
+    ['CPU',             d.cpu],
+    ['CPU Cores',       d.cores],
+    ['RAM',             d.ram],
+    ['Storage',         d.storage],
+    ['IP Address',      d.ip],
+    ['MAC Address',     d.mac],
+    [''],
+    ['BATERAI', ''],
+    ['Battery Level',   d.bat_pct],
+    ['Charging Status', d.bat_charge],
+    ['Design Capacity', d.bat_design],
+    ['Current Max Cap', d.bat_current],
+    ['Battery Health',  d.bat_health],
+  ];
+  const ws1 = XLSX.utils.aoa_to_sheet(s1);
+  ws1['!cols'] = [{ wch: 20 }, { wch: 55 }];
+  // Bold header
+  if (ws1['A1']) ws1['A1'].s = { font: { bold: true, sz: 13 } };
+  if (ws1['A7']) ws1['A7'].s = { font: { bold: true } };
+  if (ws1['A20']) ws1['A20'].s = { font: { bold: true } };
+  XLSX.utils.book_append_sheet(wb, ws1, 'Ringkasan');
+
+  // Sheet 2: Software
+  const swData = [
+    ['No', 'Nama Software'],
+    ...d.software.map((s, i) => [i + 1, s])
+  ];
+  const ws2 = XLSX.utils.aoa_to_sheet(swData);
+  ws2['!cols'] = [{ wch: 6 }, { wch: 60 }];
+  if (ws2['A1']) ws2['A1'].s = { font: { bold: true } };
+  if (ws2['B1']) ws2['B1'].s = { font: { bold: true } };
+  XLSX.utils.book_append_sheet(wb, ws2, 'Software');
+
+  XLSX.writeFile(wb, `asset_${d.asset}.xlsx`);
+  toast('✅ XLSX berhasil diunduh!');
+}
+</script>
+</body>
+</html>
