@@ -28,7 +28,8 @@ class ImageCaptureFrame(ctk.CTkFrame):
 
         hint = ctk.CTkLabel(
             self, text="Pilih foto fisik perangkat (Cover, Keyboard, Layar, dll).\n"
-                       "Minimal 1 foto direkomendasikan.",
+                       "Minimal 1 foto direkomendasikan.\n"
+                       "Rename file foto dengan format: [JenisFoto] e.g. Cover.jpg, Keyboard.png",
             font=ctk.CTkFont(size=13),
             text_color="gray",
         )

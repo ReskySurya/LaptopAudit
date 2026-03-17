@@ -30,7 +30,7 @@ class InputForm(ctk.CTkScrollableFrame):
 
         # ── Kode Asset ───────────────────────────────
         self._add_label("Kode Asset *")
-        self.entries["kode_asset"] = self._add_entry("Contoh: LP-130")
+        self.entries["kode_asset"] = self._add_entry("Contoh: HD/2022/08/JKT/LP224")
 
         # ── Jenis Asset ──────────────────────────────
         self._add_label("Jenis Asset *")
