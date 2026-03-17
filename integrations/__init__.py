@@ -1,0 +1,1 @@
+"""Integrations package — SharePoint upload."""
