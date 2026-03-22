@@ -280,26 +280,7 @@ class AuditApp(ctk.CTk):
         )
         hint.pack(pady=(0, 15))
 
-        # Tombol lanjut (Pack ke bottom duluan)
-        next_btn = ctk.CTkButton(
-            self.content_frame,
-            text=">>  Generate Laporan",
-            font=ctk.CTkFont(size=16, weight="bold"),
-            height=45, corner_radius=10,
-            command=self._on_saran_submitted,
-        )
-        next_btn.pack(side="bottom", pady=(5, 15), fill="x", padx=30)
-        
-        # Placeholder hint
-        placeholder_label = ctk.CTkLabel(
-            self.content_frame,
-            text="Contoh: Keyboard beberapa tombol sudah tidak responsif, baterai cepat habis, dsb.",
-            font=ctk.CTkFont(size=11),
-            text_color="gray",
-        )
-        placeholder_label.pack(side="bottom", pady=(0, 10))
-
-        # Text area (Sekarang expand di sisa space atas)
+        # Text area
         self.saran_textbox = ctk.CTkTextbox(
             self.content_frame,
             height=350,
@@ -309,6 +290,25 @@ class AuditApp(ctk.CTk):
         )
         self.saran_textbox.pack(fill="both", expand=True, padx=30, pady=(0, 10))
         self.saran_textbox.insert("1.0", "")
+
+        # Placeholder hint
+        placeholder_label = ctk.CTkLabel(
+            self.content_frame,
+            text="Contoh: Keyboard beberapa tombol sudah tidak responsif, baterai cepat habis, dsb.",
+            font=ctk.CTkFont(size=11),
+            text_color="gray",
+        )
+        placeholder_label.pack(pady=(0, 10))
+
+        # Tombol lanjut
+        next_btn = ctk.CTkButton(
+            self.content_frame,
+            text=">>  Generate Laporan",
+            font=ctk.CTkFont(size=16, weight="bold"),
+            height=45, corner_radius=10,
+            command=self._on_saran_submitted,
+        )
+        next_btn.pack(pady=(5, 15), fill="x", padx=30)
 
     def _on_saran_submitted(self):
         self.saran_keluhan = self.saran_textbox.get("1.0", "end-1c").strip()
