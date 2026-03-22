@@ -64,20 +64,20 @@ class ImageCaptureFrame(ctk.CTkFrame):
         )
         self.count_label.pack(pady=(0, 10))
 
-        # Area preview (scrollable)
-        self.preview_frame = ctk.CTkScrollableFrame(
-            self, height=300, label_text="Preview Foto",
-        )
-        self.preview_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
-
-        # Tombol lanjut
+        # Tombol lanjut (Pack di bawah terlebih dahulu agar tidak tersembunyi)
         continue_btn = ctk.CTkButton(
             self, text="▶  Generate Laporan",
             font=ctk.CTkFont(size=16, weight="bold"),
             height=45, corner_radius=10,
             command=self._continue,
         )
-        continue_btn.pack(pady=(5, 15), fill="x", padx=20)
+        continue_btn.pack(side="bottom", pady=(5, 15), fill="x", padx=20)
+
+        # Area preview (scrollable)
+        self.preview_frame = ctk.CTkScrollableFrame(
+            self, height=300, label_text="Preview Foto",
+        )
+        self.preview_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
 
     def _choose_images(self):
         """Buka dialog file untuk memilih gambar."""
