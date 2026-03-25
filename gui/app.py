@@ -357,10 +357,16 @@ class AuditApp(ctk.CTk):
         }
 
         kode = self.user_data.get("kode_asset", "UNKNOWN")
-        tanggal = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        pic = self.user_data.get("pic_asset", "Unknown")
+        year = datetime.datetime.now().strftime("%Y")
 
-        pdf_filename = f"Report_Audit_{kode}_{tanggal}.pdf"
-        xlsx_filename = f"Audit_{kode}_{tanggal}.xlsx"
+        # Ambil bagian LP-xxx dari kode asset (misal "HD/2022/08/JOG/LP-130" -> "LP-130")
+        kode_short = kode.split("/")[-1].split("\\")[-1] if "/" in kode or "\\" in kode else kode
+        # Sanitasi nama PIC untuk filename (spasi -> underscore, hapus karakter ilegal)
+        pic_safe = pic.replace(" ", "_").replace("/", "_").replace("\\", "_")
+
+        pdf_filename = f"Report_Audit_{kode_short}_{pic_safe}_{year}.pdf"
+        xlsx_filename = f"Audit_{kode_short}_{pic_safe}_{year}.xlsx"
 
         pdf_path = os.path.join(OUTPUT_DIR, pdf_filename)
         xlsx_path = os.path.join(OUTPUT_DIR, xlsx_filename)
@@ -424,7 +430,7 @@ class AuditApp(ctk.CTk):
             btn_frame, text="Buka Folder Output",
             font=ctk.CTkFont(size=14, weight="bold"),
             height=40, width=200,
-            command=lambda: os.startfile(OUTPUT_DIR) if os.name == "nt" else None,
+            command=self._open_output_folder,
         )
         open_folder_btn.pack(side="left", padx=10)
 
@@ -491,6 +497,23 @@ class AuditApp(ctk.CTk):
 
         thread = threading.Thread(target=_do_upload, daemon=True)
         thread.start()
+
+    def _open_output_folder(self):
+        """Buka folder output di file manager (cross-platform)."""
+        import subprocess as sp
+        import sys as _sys
+
+        folder = OUTPUT_DIR
+        try:
+            if _sys.platform == "win32":
+                os.startfile(folder)
+            elif _sys.platform == "darwin":
+                sp.Popen(["open", folder])
+            else:
+                # Linux: xdg-open
+                sp.Popen(["xdg-open", folder])
+        except Exception:
+            pass
 
     def _reset(self):
         self.user_data = {}
