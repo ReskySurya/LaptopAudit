@@ -120,6 +120,8 @@ def _get_linux_info() -> dict:
             pass
 
     # Serial Number — perlu fallback chain karena biasanya butuh root/sudo
+    # Catatan: saat double-click (tanpa terminal), `sudo` tidak bisa prompt password.
+    #          Gunakan `pkexec` (PolicyKit) untuk GUI password dialog.
     serial_path = "/sys/class/dmi/id/product_serial"
     try:
         with open(serial_path) as f:
@@ -127,15 +129,22 @@ def _get_linux_info() -> dict:
             if val:
                 info["serial_number"] = val
     except (FileNotFoundError, PermissionError):
-        # Fallback 1: sudo cat
-        val = _run_cmd(f"sudo cat {serial_path} 2>/dev/null")
-        if val:
-            info["serial_number"] = val
-        else:
-            # Fallback 2: sudo dmidecode
-            val = _run_cmd("sudo dmidecode -s system-serial-number 2>/dev/null")
-            if val:
+        # Coba beberapa metode elevated-access
+        serial_commands = [
+            # pkexec: GUI password dialog (bekerja tanpa terminal)
+            f"pkexec cat {serial_path}",
+            # sudo (hanya bekerja jika ada terminal / cached credentials)
+            f"sudo -n cat {serial_path}",
+            # dmidecode via pkexec
+            "pkexec dmidecode -s system-serial-number",
+            # dmidecode via sudo
+            "sudo -n dmidecode -s system-serial-number",
+        ]
+        for cmd in serial_commands:
+            val = _run_cmd(cmd)
+            if val and val.lower() not in ("", "none", "n/a"):
                 info["serial_number"] = val
+                break
 
     return info
 
