@@ -105,11 +105,10 @@ def _get_linux_info() -> dict:
 
     info["os_build"] = platform.release()
 
-    # Vendor, Model, Serial via DMI
+    # Vendor & Model via DMI (biasanya readable tanpa sudo)
     dmi_map = {
         "vendor": "/sys/class/dmi/id/sys_vendor",
         "model": "/sys/class/dmi/id/product_name",
-        "serial_number": "/sys/class/dmi/id/product_serial",
     }
     for key, path in dmi_map.items():
         try:
@@ -119,6 +118,24 @@ def _get_linux_info() -> dict:
                     info[key] = val
         except (FileNotFoundError, PermissionError):
             pass
+
+    # Serial Number — perlu fallback chain karena biasanya butuh root/sudo
+    serial_path = "/sys/class/dmi/id/product_serial"
+    try:
+        with open(serial_path) as f:
+            val = f.read().strip()
+            if val:
+                info["serial_number"] = val
+    except (FileNotFoundError, PermissionError):
+        # Fallback 1: sudo cat
+        val = _run_cmd(f"sudo cat {serial_path} 2>/dev/null")
+        if val:
+            info["serial_number"] = val
+        else:
+            # Fallback 2: sudo dmidecode
+            val = _run_cmd("sudo dmidecode -s system-serial-number 2>/dev/null")
+            if val:
+                info["serial_number"] = val
 
     return info
 

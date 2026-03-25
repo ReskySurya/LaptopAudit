@@ -2,6 +2,7 @@
 Collector: Hardware — CPU, RAM, Storage.
 """
 import platform
+import subprocess
 import psutil
 
 
@@ -13,10 +14,11 @@ def get_cpu_info() -> dict:
         dict: cpu_name, cpu_cores (fisik), cpu_threads (logis)
     """
     cpu_name = platform.processor() or "Unknown"
+    system = platform.system()
 
     # Di Windows, platform.processor() sering terlalu singkat,
     # coba ambil dari psutil atau environment
-    if platform.system() == "Windows":
+    if system == "Windows":
         import os
         env_cpu = os.environ.get("PROCESSOR_IDENTIFIER", "")
         if env_cpu:
@@ -24,10 +26,45 @@ def get_cpu_info() -> dict:
 
         # Coba WMI untuk nama lengkap
         try:
-            import subprocess
             result = subprocess.run(
                 'powershell -Command "(Get-CimInstance Win32_Processor | Select-Object -First 1).Name"',
                 shell=True, capture_output=True, text=True, timeout=10
+            )
+            if result.stdout.strip():
+                cpu_name = result.stdout.strip()
+        except Exception:
+            pass
+
+    elif system == "Linux":
+        # platform.processor() sering kosong di Linux, baca dari /proc/cpuinfo
+        try:
+            with open("/proc/cpuinfo") as f:
+                for line in f:
+                    if line.strip().startswith("model name"):
+                        cpu_name = line.split(":", 1)[1].strip()
+                        break
+        except (FileNotFoundError, PermissionError):
+            pass
+
+        # Fallback via lscpu jika masih Unknown
+        if cpu_name in ("Unknown", ""):
+            try:
+                result = subprocess.run(
+                    ["lscpu"], capture_output=True, text=True, timeout=10
+                )
+                for line in result.stdout.splitlines():
+                    if line.strip().startswith("Model name"):
+                        cpu_name = line.split(":", 1)[1].strip()
+                        break
+            except Exception:
+                pass
+
+    elif system == "Darwin":
+        # macOS: gunakan sysctl untuk nama CPU lengkap
+        try:
+            result = subprocess.run(
+                ["sysctl", "-n", "machdep.cpu.brand_string"],
+                capture_output=True, text=True, timeout=10
             )
             if result.stdout.strip():
                 cpu_name = result.stdout.strip()
