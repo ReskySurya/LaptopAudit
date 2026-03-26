@@ -1,1 +1,1 @@
-"""Reports package — PDF dan XLSX report generation."""
+"""Reports package — PDF report generation dan Google Sheets integration."""

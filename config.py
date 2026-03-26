@@ -36,11 +36,6 @@ KONDISI_OPTIONS = ["Baik", "Rusak", "Lecet"]
 KOMPONEN_FISIK = ["Cover", "Back Cover", "Engsel", "Layar", "Keyboard"]
 JENIS_ASSET_OPTIONS = ["Laptop", "PC"]
 
-# ── SharePoint Configuration ─────────────────────────────
-# Isi dengan credentials Azure AD Anda
-SHAREPOINT_TENANT_ID = ""
-SHAREPOINT_CLIENT_ID = ""
-SHAREPOINT_CLIENT_SECRET = ""
-SHAREPOINT_SITE_URL = ""  # contoh: "https://yourcompany.sharepoint.com/sites/IT-Assets"
-SHAREPOINT_DRIVE_ID = ""  # ID drive/document library
-SHAREPOINT_UPLOAD_FOLDER = "Audit Reports"  # Folder tujuan upload
+# ── Google Sheets Configuration ──────────────────────────
+GOOGLE_SHEET_ID = "14nQTHNxepU-e298LrYLGVegAiG8guyBzkEfdjAXVBNk"
+GOOGLE_CREDENTIALS_FILE = os.path.join(BASE_DIR, "credentials.json")

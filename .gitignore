@@ -9,3 +9,9 @@ __pycache__/
 
 # Env file
 .env
+
+# Google Service Account credentials (JANGAN push ke repo!)
+credentials.json
+
+# Output audit
+output/

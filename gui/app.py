@@ -348,7 +348,7 @@ class AuditApp(ctk.CTk):
         thread.start()
 
     def _generate_reports(self, status_label, progress_bar, detail_label):
-        """Generate PDF dan XLSX."""
+        """Generate PDF dan append ke Google Sheets."""
         combined_data = {
             **self.user_data,
             **self.scan_data,
@@ -366,12 +366,9 @@ class AuditApp(ctk.CTk):
         pic_safe = pic.replace(" ", "_").replace("/", "_").replace("\\", "_")
 
         pdf_filename = f"Report_Audit_{kode_short}_{pic_safe}_{year}.pdf"
-        xlsx_filename = f"Audit_{kode_short}_{pic_safe}_{year}.xlsx"
-
         pdf_path = os.path.join(OUTPUT_DIR, pdf_filename)
-        xlsx_path = os.path.join(OUTPUT_DIR, xlsx_filename)
 
-        results = {"pdf": None, "xlsx": None, "errors": []}
+        results = {"pdf": None, "gsheet": None, "errors": []}
 
         # Step 1: PDF
         self.after(0, lambda: detail_label.configure(text="Membuat laporan PDF..."))
@@ -383,15 +380,18 @@ class AuditApp(ctk.CTk):
         except Exception as e:
             results["errors"].append(f"PDF Error: {e}")
 
-        # Step 2: XLSX
-        self.after(0, lambda: detail_label.configure(text="Membuat spreadsheet XLSX..."))
+        # Step 2: Append ke Google Sheets
+        self.after(0, lambda: detail_label.configure(text="Mengirim data ke Google Sheets..."))
         self.after(0, lambda: progress_bar.set(0.7))
         try:
-            from reports.xlsx_report import generate_xlsx
-            generate_xlsx(combined_data, xlsx_path)
-            results["xlsx"] = xlsx_path
+            from reports.gsheet_report import append_to_google_sheet
+            success, message = append_to_google_sheet(combined_data)
+            if success:
+                results["gsheet"] = message
+            else:
+                results["errors"].append(f"Google Sheets: {message}")
         except Exception as e:
-            results["errors"].append(f"XLSX Error: {e}")
+            results["errors"].append(f"Google Sheets Error: {e}")
 
         self.after(0, lambda: progress_bar.set(1.0))
         self.after(0, lambda: self._show_results(results))
@@ -410,16 +410,25 @@ class AuditApp(ctk.CTk):
 
         if results["pdf"]:
             self._add_result_row("PDF Report", results["pdf"])
-        if results["xlsx"]:
-            self._add_result_row("Excel Spreadsheet", results["xlsx"])
+
+        # Google Sheets status
+        if results.get("gsheet"):
+            gsheet_label = ctk.CTkLabel(
+                self.content_frame,
+                text=f"✔  {results['gsheet']}",
+                font=ctk.CTkFont(size=14, weight="bold"),
+                text_color="#4CAF50",
+            )
+            gsheet_label.pack(pady=(10, 5))
 
         if results["errors"]:
             for err in results["errors"]:
                 err_label = ctk.CTkLabel(
                     self.content_frame,
-                    text=f"WARNING: {err}",
+                    text=f"⚠  {err}",
                     text_color="orange",
                     font=ctk.CTkFont(size=13),
+                    wraplength=700,
                 )
                 err_label.pack(pady=3)
 
@@ -434,14 +443,6 @@ class AuditApp(ctk.CTk):
         )
         open_folder_btn.pack(side="left", padx=10)
 
-        upload_btn = ctk.CTkButton(
-            btn_frame, text="Upload ke SharePoint",
-            font=ctk.CTkFont(size=14, weight="bold"),
-            height=40, width=220,
-            command=lambda: self._upload_sharepoint(results),
-        )
-        upload_btn.pack(side="left", padx=10)
-
         new_btn = ctk.CTkButton(
             btn_frame, text="Audit Baru",
             font=ctk.CTkFont(size=14),
@@ -450,13 +451,6 @@ class AuditApp(ctk.CTk):
             command=self._reset,
         )
         new_btn.pack(side="left", padx=10)
-
-        self.sp_status = ctk.CTkLabel(
-            self.content_frame,
-            text="",
-            font=ctk.CTkFont(size=13),
-        )
-        self.sp_status.pack(pady=(10, 0))
 
     def _add_result_row(self, label: str, path: str):
         row = ctk.CTkFrame(self.content_frame, fg_color="transparent")
@@ -470,33 +464,7 @@ class AuditApp(ctk.CTk):
             font=ctk.CTkFont(size=13), text_color="gray", anchor="e",
         ).pack(side="right")
 
-    def _upload_sharepoint(self, results: dict):
-        self.sp_status.configure(text="Uploading ke SharePoint...", text_color="yellow")
 
-        def _do_upload():
-            try:
-                from integrations.sharepoint import SharePointUploader
-                uploader = SharePointUploader()
-
-                files_to_upload = []
-                if results.get("pdf"):
-                    files_to_upload.append(results["pdf"])
-                if results.get("xlsx"):
-                    files_to_upload.append(results["xlsx"])
-
-                for fpath in files_to_upload:
-                    uploader.upload_file(fpath)
-
-                self.after(0, lambda: self.sp_status.configure(
-                    text="Berhasil upload ke SharePoint!", text_color="#4CAF50"
-                ))
-            except Exception as e:
-                self.after(0, lambda: self.sp_status.configure(
-                    text=f"SharePoint Error: {e}", text_color="orange"
-                ))
-
-        thread = threading.Thread(target=_do_upload, daemon=True)
-        thread.start()
 
     def _open_output_folder(self):
         """Buka folder output di file manager (cross-platform)."""
