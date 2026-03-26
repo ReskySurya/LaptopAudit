@@ -3,9 +3,22 @@ Report: XLSX — Generate spreadsheet Excel untuk database audit.
 Menggunakan openpyxl.
 """
 import os
+import re
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from config import KOMPONEN_FISIK
+
+# Karakter kontrol ilegal di XML (openpyxl akan error jika ada)
+_ILLEGAL_XML_CHARS = re.compile(
+    r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]'
+)
+
+
+def _sanitize(value):
+    """Bersihkan karakter ilegal XML dari string untuk openpyxl."""
+    if isinstance(value, str):
+        return _ILLEGAL_XML_CHARS.sub('', value)
+    return value
 
 
 def generate_xlsx(data: dict, output_path: str):
@@ -135,7 +148,7 @@ def generate_xlsx(data: dict, output_path: str):
     data_alignment = Alignment(vertical="center", wrap_text=True)
 
     for col, value in enumerate(row_data, start=1):
-        cell = ws.cell(row=2, column=col, value=value)
+        cell = ws.cell(row=2, column=col, value=_sanitize(value))
         cell.font = data_font
         cell.alignment = data_alignment
         cell.border = thin_border
@@ -180,7 +193,7 @@ def generate_xlsx(data: dict, output_path: str):
 
         for i, sw_name in enumerate(sw_list, start=1):
             ws2.cell(row=i + 1, column=1, value=i).border = thin_border
-            ws2.cell(row=i + 1, column=2, value=sw_name).border = thin_border
+            ws2.cell(row=i + 1, column=2, value=_sanitize(sw_name)).border = thin_border
 
         ws2.column_dimensions["A"].width = 8
         ws2.column_dimensions["B"].width = 50
